@@ -91,13 +91,13 @@ def get_mntr_output(conn_dict,timestamp):
   return mntr_dict
 
 # Prepare json object for each of the zk stats in format recognized by Ambari metrics
-def construct_metric(key,value,zkquorum,timestamp):
+def construct_metric(key,value,zkleader,timestamp):
     metrics = {}
     vals = {}
     metric_dict = {}
 
     # hostname may change based on current leader, quorum will not. Hence setting hostname in metric array to quorum
-    metrics["hostname"] = zkquorum
+    metrics["hostname"] = zkleader
     metrics["appid"] = "Zookeeper"
     metrics["starttime"] = timestamp
     metrics["timestamp"] = timestamp
@@ -135,6 +135,7 @@ def publish_metrics(metric_data,ams_collector_host,ams_collector_port):
     url = "http://"+ str(ams_collector_host) +":" + str(int(ams_collector_port)) + "/ws/v1/timeline/metrics"
     headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
     req = urllib2.Request(url, metric_data, headers)
+    #print metric_data
     try: urllib2.urlopen(req)
     except URLError as e:
       print 'Metrics submission failed with error:', e.errno
@@ -155,6 +156,7 @@ def main():
   zkquorum = config_dict["zkquorum"]
   # Identify leader from zookeeper quorum, because specific stats in mntr output are shown only when run against leader
   conn_params = get_leader(config_dict,'stat')
+  zkleader = conn_params["zkhost"]
   # Set a timestamp per iteration as time when we run mntr command
   timestamp = int(time.time())
   # Run mntr command against leader, return a multiline set of strings as output
@@ -162,7 +164,7 @@ def main():
   # Extract each line from mntr output
   for k,v in mntr_output.iteritems():
     # construct metrics json object as expected by ambari from the key value pairs obtained in mntr output
-    metric_data = construct_metric(k,v,zkquorum,timestamp)
+    metric_data = construct_metric(k,v,zkleader,timestamp)
     # Publish json object to the AMS collector server
     publish_metrics(metric_data,conn_params["ams_collector_host"],conn_params["ams_collector_port"])
 
