@@ -81,13 +81,21 @@ def get_leader(conn_dict,cmd):
 
 def get_mntr_output(conn_dict,timestamp):
   mntr_dict = {}
+  server_state = {
+    1: "follower",
+    2:  "leader",
+    3:  "standalone"
+  }
   # Set a single timestamp for metrics pulled from a single command
   socket_data = netcat(conn_dict["zkhost"],int(conn_dict["zkport"]),'mntr')
   for kvpair in socket_data.splitlines():
     # Version is an unchanging value. Not required in metrics data. Skip line
     if "version" not in kvpair.lower():
       key,value=kvpair.split('\t')
-      mntr_dict[key]=value
+      if key == "zk_server_state":
+        mntr_dict[key]=server_state.get(value,0)
+      else
+        mntr_dict[key]=value
   return mntr_dict
 
 # Prepare json object for each of the zk stats in format recognized by Ambari metrics
@@ -95,8 +103,6 @@ def construct_metric(key,value,zkleader,timestamp):
     metrics = {}
     vals = {}
     metric_dict = {}
-
-    # hostname may change based on current leader, quorum will not. Hence setting hostname in metric array to quorum
     metrics["hostname"] = zkleader
     metrics["appid"] = "Zookeeper"
     metrics["starttime"] = timestamp
