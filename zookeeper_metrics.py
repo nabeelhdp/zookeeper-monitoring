@@ -104,7 +104,8 @@ def construct_metric(key,value,zkleader,timestamp):
     vals = {}
     metric_dict = {}
     metrics["hostname"] = zkleader
-    metrics["appid"] = "Zookeeper"
+    metrics["appid"] = "zookeeper"
+    metrics["type"]="COUNTER"
     metrics["starttime"] = timestamp
     metrics["timestamp"] = timestamp
     metrics["metricname"] = key
@@ -164,7 +165,7 @@ def main():
   conn_params = get_leader(config_dict,'stat')
   zkleader = conn_params["zkhost"]
   # Set a timestamp per iteration as time when we run mntr command
-  timestamp = int(time.time())
+  timestamp = int(time.time()*1000)
   # Run mntr command against leader, return a multiline set of strings as output
   mntr_output = get_mntr_output(conn_params,timestamp)
   # Extract each line from mntr output
