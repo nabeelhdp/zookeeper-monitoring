@@ -94,7 +94,7 @@ def get_mntr_output(conn_dict,timestamp):
       key,value=kvpair.split('\t')
       if key == "zk_server_state":
         mntr_dict[key]=server_state.get(value,0)
-      else
+      else:
         mntr_dict[key]=value
   return mntr_dict
 
