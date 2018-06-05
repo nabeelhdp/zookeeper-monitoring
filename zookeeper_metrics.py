@@ -174,7 +174,7 @@ def main():
     # construct metrics json object as expected by ambari from the key value pairs obtained in mntr output
     metric_data = construct_metric(k,v,zkleader,timestamp)
     # Publish json object to the AMS collector server
-    print 'Publishing metric data for metric',k
+    print ("Publishing metric data for metric") % (k)
     publish_metrics(metric_data,conn_params["ams_collector_host"],conn_params["ams_collector_port"])
 
 if __name__== "__main__":
