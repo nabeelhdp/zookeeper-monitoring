@@ -143,7 +143,7 @@ def publish_metrics(metric_data,ams_collector_host,ams_collector_port):
     headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
     req = urllib2.Request(url, metric_data, headers)
     #print metric_data
-    try: urllib2.urlopen(req)
+    try: urllib2.urlopen(req,timeout=5)
     except URLError as e:
       print 'Metrics submission failed with error:', e.errno
 
@@ -167,12 +167,14 @@ def main():
   # Set a timestamp per iteration as time when we run mntr command
   timestamp = int(time.time()*1000)
   # Run mntr command against leader, return a multiline set of strings as output
+  print 'Extracting zookeeper connection statistics'
   mntr_output = get_mntr_output(conn_params,timestamp)
   # Extract each line from mntr output
   for k,v in mntr_output.iteritems():
     # construct metrics json object as expected by ambari from the key value pairs obtained in mntr output
     metric_data = construct_metric(k,v,zkleader,timestamp)
     # Publish json object to the AMS collector server
+    print 'Publishing metric data for metric',k
     publish_metrics(metric_data,conn_params["ams_collector_host"],conn_params["ams_collector_port"])
 
 if __name__== "__main__":
