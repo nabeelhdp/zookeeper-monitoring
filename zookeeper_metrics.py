@@ -1,3 +1,4 @@
+
 import socket
 import subprocess
 import sys
@@ -41,7 +42,7 @@ def get_config_params(config_file):
   if not zk_timeout.isdigit():
     print "Invalid timeout value specified for zookeeper. Using default of 3 seconds"
     zk_timeout = 3
-    
+
   zkquorum = parser.get('zk_config', 'zkquorum')
   for zkinstance in zkquorum.split(','):
       zkhost,zkport = zkinstance.strip().split(':')
@@ -171,23 +172,26 @@ def main():
 
   # Read zookeeper connection parameters from configuration filename
   config_dict = get_config_params(config_file)
-  # Move zkquorum to a separate variable to later pass to the metric construction code
+  # Move zkquorum and zktimeout to separate variables to later pass to the metric construction code
   zkquorum = config_dict["zkquorum"]
+  zk_timeout = float(config_dict["zk_timeout"])
+
   # Identify leader from zookeeper quorum, because specific stats in mntr output are shown only when run against leader
-  conn_params = get_leader(config_dict,'stat',config_dict["zk_timeout"])
+  conn_params = get_leader(config_dict,'stat',zk_timeout)
   zkleader = conn_params["zkhost"]
   # Set a timestamp per iteration as time when we run mntr command
   timestamp = int(time.time()*1000)
   # Run mntr command against leader, return a multiline set of strings as output
   print 'Extracting zookeeper connection statistics'
-  mntr_output = get_mntr_output(conn_params,timestamp,config_dict["zk_timeout"])
+  mntr_output = get_mntr_output(conn_params,timestamp,zk_timeout)
   # Extract each line from mntr output
   for k,v in mntr_output.iteritems():
     # construct metrics json object as expected by ambari from the key value pairs obtained in mntr output
     metric_data = construct_metric(k,v,zkleader,timestamp)
     # Publish json object to the AMS collector server
-    print ("Publishing metric data for metric") % (k)
-    publish_metrics(metric_data,conn_params["ams_collector_host"],conn_params["ams_collector_port"],config_dict["ams_collector_timeout"])
+    print "Publishing metric data for metric: ",k
+    ams_collector_timeout = float(config_dict["ams_collector_timeout"])
+    publish_metrics(metric_data,conn_params["ams_collector_host"],conn_params["ams_collector_port"],ams_collector_timeout)
 
-if __name__== "__main__":
+if __name__ == "__main__":
   main()
