@@ -37,10 +37,10 @@ def get_config_params(config_file):
   ams_collector_timeout = parser.get('zk_config', 'ams_collector_timeout')
   if not ams_collector_timeout.isdigit():
     print "Invalid timeout value specified for AMS Collector. Using default of 3 seconds"
-    ams_collector_timeout = 5
+    ams_collector_timeout = 3
   if not zk_timeout.isdigit():
     print "Invalid timeout value specified for zookeeper. Using default of 3 seconds"
-    zk_timeout = 5
+    zk_timeout = 3
     
   zkquorum = parser.get('zk_config', 'zkquorum')
   for zkinstance in zkquorum.split(','):
