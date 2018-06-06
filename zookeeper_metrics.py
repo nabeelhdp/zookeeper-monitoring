@@ -33,6 +33,15 @@ def get_config_params(config_file):
     print "Invalid hostname provided for AMS collector. Exiting"
     sys.exit(1)
 
+  zk_timeout = parser.get('zk_config', 'zktimeout')
+  ams_collector_timeout = parser.get('zk_config', 'ams_collector_timeout')
+  if not ams_collector_timeout.isdigit():
+    print "Invalid timeout value specified for AMS Collector. Using default of 3 seconds"
+    ams_collector_timeout = 5
+  if not zk_timeout.isdigit():
+    print "Invalid timeout value specified for zookeeper. Using default of 3 seconds"
+    zk_timeout = 5
+    
   zkquorum = parser.get('zk_config', 'zkquorum')
   for zkinstance in zkquorum.split(','):
       zkhost,zkport = zkinstance.strip().split(':')
@@ -48,13 +57,16 @@ def get_config_params(config_file):
   config_dict["ams_collector_host"] = ams_collector_host
   config_dict["ams_collector_port"] = ams_collector_port
   config_dict["zkquorum"] = zkquorum
+  config_dict["ams_collector_timeout"] = ams_collector_timeout
+  config_dict["zk_timeout"] = zk_timeout
   return config_dict
 
 
 # Read command output from socket and return output
-def netcat(host, port, command):
+def netcat(host, port, command, timeout):
   try:
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(timeout)
     s.connect((host, port))
     s.sendall(command)
     s.shutdown(socket.SHUT_WR)
@@ -65,10 +77,10 @@ def netcat(host, port, command):
     sys.exit(1)
 
 # Identify leader in zookeeper quorum
-def get_leader(conn_dict,cmd):
+def get_leader(conn_dict,cmd,timeout):
   for zkinstance in conn_dict["zkquorum"].split(','):
     zkhost,zkport = zkinstance.split(':')
-    socket_data = netcat(zkhost,int(zkport),cmd)
+    socket_data = netcat(zkhost,int(zkport),cmd,timeout)
     # Iterate in output for the Mode line to identify current quorum leader
     for kvpair in socket_data.splitlines():
       if "mode" in kvpair.lower():
@@ -79,7 +91,7 @@ def get_leader(conn_dict,cmd):
   print "No zookeeper leader found. Exiting"
   sys.exit(1)
 
-def get_mntr_output(conn_dict,timestamp):
+def get_mntr_output(conn_dict,timestamp,timeout):
   mntr_dict = {}
   server_state = {
     1: "follower",
@@ -87,7 +99,7 @@ def get_mntr_output(conn_dict,timestamp):
     3:  "standalone"
   }
   # Set a single timestamp for metrics pulled from a single command
-  socket_data = netcat(conn_dict["zkhost"],int(conn_dict["zkport"]),'mntr')
+  socket_data = netcat(conn_dict["zkhost"],int(conn_dict["zkport"]),'mntr',timeout)
   for kvpair in socket_data.splitlines():
     # Version is an unchanging value. Not required in metrics data. Skip line
     if "version" not in kvpair.lower():
@@ -127,7 +139,7 @@ def is_valid_hostname(hostname):
     return all(allowed.match(x) for x in hostname.split("."))
 
 # Publishing the Metrics to Collector using HTTP call
-def publish_metrics(metric_data,ams_collector_host,ams_collector_port):
+def publish_metrics(metric_data,ams_collector_host,ams_collector_port,timeout):
     # Test socket connectivity to AMS Collector service port
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -143,7 +155,7 @@ def publish_metrics(metric_data,ams_collector_host,ams_collector_port):
     headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
     req = urllib2.Request(url, metric_data, headers)
     #print metric_data
-    try: urllib2.urlopen(req,timeout=5)
+    try: urllib2.urlopen(req,timeout=timeout)
     except URLError as e:
       print 'Metrics submission failed with error:', e.errno
 
@@ -162,20 +174,20 @@ def main():
   # Move zkquorum to a separate variable to later pass to the metric construction code
   zkquorum = config_dict["zkquorum"]
   # Identify leader from zookeeper quorum, because specific stats in mntr output are shown only when run against leader
-  conn_params = get_leader(config_dict,'stat')
+  conn_params = get_leader(config_dict,'stat',config_dict["zk_timeout"])
   zkleader = conn_params["zkhost"]
   # Set a timestamp per iteration as time when we run mntr command
   timestamp = int(time.time()*1000)
   # Run mntr command against leader, return a multiline set of strings as output
   print 'Extracting zookeeper connection statistics'
-  mntr_output = get_mntr_output(conn_params,timestamp)
+  mntr_output = get_mntr_output(conn_params,timestamp,config_dict["zk_timeout"])
   # Extract each line from mntr output
   for k,v in mntr_output.iteritems():
     # construct metrics json object as expected by ambari from the key value pairs obtained in mntr output
     metric_data = construct_metric(k,v,zkleader,timestamp)
     # Publish json object to the AMS collector server
     print ("Publishing metric data for metric") % (k)
-    publish_metrics(metric_data,conn_params["ams_collector_host"],conn_params["ams_collector_port"])
+    publish_metrics(metric_data,conn_params["ams_collector_host"],conn_params["ams_collector_port"],config_dict["ams_collector_timeout"])
 
 if __name__== "__main__":
   main()
