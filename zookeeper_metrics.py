@@ -1,5 +1,6 @@
 
 import socket
+import os
 import subprocess
 import sys
 import urllib
@@ -163,7 +164,7 @@ def publish_metrics(metric_data,ams_collector_host,ams_collector_port,timeout):
 def main():
 
   # If config file explicitly passed, use it. Else fall back to zk_config.ini as default filename
-  config_file = sys.argv[1] if len(sys.argv) >= 2 else 'zk_config.ini'
+  config_file = sys.argv[1] if len(sys.argv) >= 2 else os.path.join(os.path.dirname(__file__),"zk_config.ini")
 
   # Initialize dictionaries
   mntr_output = {}
